@@ -5,6 +5,11 @@
 #include <ucontext.h>
 
 #define STACKSIZE 32768		/* tamanho de pilha das threads */
+#define ALPHA -1            /* taxa de envelhecimento de tarefas */
+#define ERROR 32          /* buffer de string para mensagem de erro */
+#define STANDARD_PRIO 0          /* valor padrão de prioridade ao criar uma tarefa */
+#define PRIO_MAX -20        /* valor da prioridade máxima para tarefas */
+#define PRIO_MIN 20         /* valor da prioridade mínima para tarefas */
 
 ///Variáveis globais    ========================================================
 task_t tarefa_principal, dispatcher, *tarefa_atual = NULL, *fila_tprontas = NULL;     //Tarefa em execução
@@ -63,6 +68,8 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg){
         task->context.uc_stack.ss_size = STACKSIZE;
         task->context.uc_stack.ss_flags = 0;
         task->context.uc_link = 0;
+        task->prio_estat = STANDARD_PRIO;
+        task->prio_dinam = STANDARD_PRIO;
         task->id = id_count++;         //Novo ID
         task->parent = tarefa_atual;    //Tarefa corrente é a criadora desta tarefa
     }
@@ -326,4 +333,44 @@ int task_set_executing(task_t* task){
         }
 
         return 0;
+}
+
+//==========================P4============================
+// define a prioridade estática de uma tarefa (ou a tarefa atual)
+void task_setprio (task_t *task, int prio) {
+    if(!task)                   //Para uma tarefa nula, será alterado a tarefa em execução
+        task = tarefa_atual;
+
+    if(prio > PRIO_MIN)               //Prioridade mínima é 20
+        prio = PRIO_MIN;
+    else if(prio < PRIO_MAX)              //Prioridade máxima é -20
+        prio = PRIO_MAX;
+
+    task->prio_estat = prio;
+    
+    if(!task)                   //Para uma tarefa nula, será alterado a tarefa em execução
+        task = tarefa_atual;
+
+    if(prio > PRIO_MIN)               //Prioridade mínima é 20
+        prio = PRIO_MIN;
+    else if(prio < PRIO_MAX)          //Prioridade máxima é -20
+        prio = PRIO_MAX;
+
+    task->prio_dinam = prio;
+    
+    #ifdef DEBUG
+    printf("task_setprio: prioridade estática de %d agora é %d\n", task->id, task->prio_estat);
+    #endif  //DEBUG
+    
+}
+
+// retorna a prioridade estática de uma tarefa (ou a tarefa atual)
+int task_getprio (task_t *task) {
+        if(!task)                   //Se for passado uma tarefa nula, utilize a tarefa em execução
+        task = tarefa_atual;
+
+    #ifdef DEBUG
+    printf("task_getprio: prioridade estática de %d é %d\n", task->tid, task->st_prio);
+    #endif  //DEBUG
+    return task->prio_estat;  
 }

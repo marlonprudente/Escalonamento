@@ -23,6 +23,8 @@ typedef struct task_t
     enum status_t status;   //Estado da tarefa
     struct task_t *parent;  //"Pai" da tarefa (tarefa em execução quando esta tarefa foi criada)
     struct queue_t **fila_atual;
+    int prio_estat;
+    int prio_dinam;
 } task_t ;
 
 // estrutura que define um semáforo
