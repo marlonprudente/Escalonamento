@@ -35,7 +35,10 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 
 # Object Files
 OBJECTFILES= \
-	${OBJECTDIR}/pingpong-scheduler.o
+	${OBJECTDIR}/pingpong-dispatcher.o \
+	${OBJECTDIR}/pingpong-scheduler.o \
+	${OBJECTDIR}/pingpong.o \
+	${OBJECTDIR}/queue.o
 
 
 # C Compiler Flags
@@ -62,10 +65,25 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/escalonamento: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
 	${LINK.c} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/escalonamento ${OBJECTFILES} ${LDLIBSOPTIONS}
 
+${OBJECTDIR}/pingpong-dispatcher.o: pingpong-dispatcher.c
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/pingpong-dispatcher.o pingpong-dispatcher.c
+
 ${OBJECTDIR}/pingpong-scheduler.o: pingpong-scheduler.c
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/pingpong-scheduler.o pingpong-scheduler.c
+
+${OBJECTDIR}/pingpong.o: pingpong.c
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/pingpong.o pingpong.c
+
+${OBJECTDIR}/queue.o: queue.c
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/queue.o queue.c
 
 # Subprojects
 .build-subprojects:
