@@ -14,6 +14,8 @@
 ///Variáveis globais    ========================================================
 task_t tarefa_principal, dispatcher, *tarefa_atual = NULL, *fila_tprontas = NULL;     //Tarefa em execução
 
+#define between(A,B,C) ((A-C>0)?(A>B&&B>B):((A==C)?(A==B&&B==C):(A<B&&B<C)))
+
 int userTasks = 0;      //Contador de tarefas de usuário ativas
 int id_count = 0;       //Contador de IDs
 
@@ -32,6 +34,26 @@ int task_set_ready(task_t* task);
 
 //Altera o estado de uma tarefa para EXECUTANDO e à retira da fila da qual pertence
 int task_set_executing(task_t* task);
+
+///Funções P04 ============================================================
+//Envelhece uma lista de tarefas
+void task_get_old(task_t* task_excluded);
+
+//Altera a prioridade dinâmica de uma tarefa
+void task_set_dinamic_prio(task_t* task, int prio);
+
+//Retorna a prioridade dinâmica de uma tarefa
+int task_get_dinamic_prio(task_t *task);
+
+//Incrementa em alpha a prioridade dinâmica de uma tarefa
+void task_alpha_dinamic_prio(task_t* task, int alpha);
+
+//Compara as prioridade de duas tarefas
+int task_compare(task_t *task1, task_t *task2);
+
+//Ordena uma lista de tarefas
+void counting_sort(task_t** task_q, int task_comp(task_t*,task_t*));
+
 
 
 // funções gerais ==============================================================
@@ -72,6 +94,10 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg){
         task->prio_dinam = STANDARD_PRIO;
         task->id = id_count++;         //Novo ID
         task->parent = tarefa_atual;    //Tarefa corrente é a criadora desta tarefa
+
+        task_setprio(task, STANDARD_PRIO);    //Prioridade default
+    	task_set_dinamic_prio(task, task_getprio(task));
+
     }
     else{
         char error[32];
@@ -281,11 +307,17 @@ task_t *scheduler(){
     if(!fila_tprontas){
         return NULL;
     }
+
+    counting_sort(&fila_tprontas, task_compare);
     
     //FCFS- ṕrimeiro elemento da fila será o próximo a executar
     task_t * next = fila_tprontas;
+
+    task_get_old(next);
+
+	task_set_dinamic_prio(next, task_getprio(next));
     //Prepara a próxima tarefa para a próxima execução
-    fila_tprontas = fila_tprontas->next;
+    //fila_tprontas = fila_tprontas->next;
     
     return next;
 }
@@ -301,6 +333,9 @@ void init_tarefa_principal(){
     tarefa_principal.id = id_count++;     //ID da tarefa principal
     tarefa_principal.parent = NULL;        //A primeira tarefa não possui pai,...
     tarefa_principal.status = EXECUTING;   //... já está em execução quando foi criada ...
+
+    task_setprio(&tarefa_principal, STANDARD_PRIO);    //Prioridade default
+    task_set_dinamic_prio(&tarefa_principal, task_getprio(&tarefa_principal));
 
     tarefa_atual = &tarefa_principal;      //... e é a tarefa em execução no momento.
 }
@@ -335,27 +370,35 @@ int task_set_executing(task_t* task){
         return 0;
 }
 
+
 //==========================P4============================
 // define a prioridade estática de uma tarefa (ou a tarefa atual)
 void task_setprio (task_t *task, int prio) {
-    if(!task)                   //Para uma tarefa nula, será alterado a tarefa em execução
-        task = tarefa_atual;
 
-    if(prio > PRIO_MIN)               //Prioridade mínima é 20
+    if(!task){                  //Para uma tarefa nula, será alterado a tarefa em execução
+        task = tarefa_atual;
+        	} 
+
+    if(prio > PRIO_MIN) {             //Prioridade mínima é 20
         prio = PRIO_MIN;
-    else if(prio < PRIO_MAX)              //Prioridade máxima é -20
+        			}
+
+    else if(prio < PRIO_MAX){              //Prioridade máxima é -20
         prio = PRIO_MAX;
+    			}
 
     task->prio_estat = prio;
     
-    if(!task)                   //Para uma tarefa nula, será alterado a tarefa em execução
+    if(!task){                 //Para uma tarefa nula, será alterado a tarefa em execução
         task = tarefa_atual;
+    		}
 
-    if(prio > PRIO_MIN)               //Prioridade mínima é 20
+    if(prio > PRIO_MIN) {              //Prioridade mínima é 20
         prio = PRIO_MIN;
-    else if(prio < PRIO_MAX)          //Prioridade máxima é -20
+    }
+    else if(prio < PRIO_MAX){          //Prioridade máxima é -20
         prio = PRIO_MAX;
-
+        	}
     task->prio_dinam = prio;
     
     #ifdef DEBUG
@@ -366,11 +409,170 @@ void task_setprio (task_t *task, int prio) {
 
 // retorna a prioridade estática de uma tarefa (ou a tarefa atual)
 int task_getprio (task_t *task) {
-        if(!task)                   //Se for passado uma tarefa nula, utilize a tarefa em execução
+        if(!task) {                  //Se for passado uma tarefa nula, utilize a tarefa em execução
         task = tarefa_atual;
-
+        		}
     #ifdef DEBUG
-    printf("task_getprio: prioridade estática de %d é %d\n", task->tid, task->st_prio);
+    printf("task_getprio: prioridade estática de %d é %d\n", task->id, task->prio_estat);
     #endif  //DEBUG
     return task->prio_estat;  
+}
+
+//Envelhece todas as tarefas da fila exceto a passada por argumento
+void task_get_old(task_t* task_excluded)
+{
+    //Existe um elemento?
+    if(!task_excluded){
+        return;
+    }
+    //Ele pertence a alguma fila?
+    if(!task_excluded->next){
+        return;
+    }
+
+    //Incremente em alpha a prioridade de todos os elementos exceto o primeiro
+    for(task_t *it = task_excluded->next; it != task_excluded; it = it->next){
+        int prio = task_get_dinamic_prio(it);
+        if(between(PRIO_MAX,prio,PRIO_MIN)){
+            task_alpha_dinamic_prio(it, ALPHA);
+        }
+    }
+}
+
+//Altera a prioridade dinâmica de um processo
+void task_set_dinamic_prio(task_t* task, int prio)
+{
+    if(!task){                   //Para uma tarefa nula, será alterado a tarefa em execução
+        task = tarefa_atual;
+        	}
+
+    if(prio > PRIO_MIN){               //Prioridade mínima é 20
+        prio = PRIO_MIN;
+    }
+    else if(prio < PRIO_MAX){          //Prioridade máxima é -20
+        prio = PRIO_MAX;
+        	}
+    task->prio_dinam = prio;
+
+    #ifdef DEBUG
+    printf("task_setdnprio: prioridade dinâmica de %d agora é %d\n", task->id, task->prio_dinam);
+    #endif  //DEBUG
+}
+
+//Retorna prioridadade dinâmica de um processo
+int task_get_dinamic_prio(task_t *task)
+{
+    if(!task){                   //Se for passado uma tarefa nula, utilize a tarefa em execução
+        task = tarefa_atual;
+    }
+    #ifdef DEBUG
+    printf("task_getdnprio: prioridade dinâmica de %d é %d\n", task->id, task->prio_dinam);
+    #endif  //DEBUG
+    return task->prio_dinam;
+}
+
+void task_alpha_dinamic_prio(task_t* task, int alpha)
+{
+    if(!task){                   //Para uma tarefa nula, será alterado a tarefa em execução
+        task = tarefa_atual;
+        	}
+    int new_prio_dinam = task->prio_dinam + alpha;
+    if(new_prio_dinam > PRIO_MIN){               //Prioridade mínima é 20
+        task->prio_dinam = PRIO_MIN;
+    }
+    else if(new_prio_dinam < PRIO_MAX){              //Prioridade máxima é -20
+        task->prio_dinam = PRIO_MAX;
+    }
+    else{
+        task->prio_dinam = new_prio_dinam;
+    }
+
+    #ifdef DEBUG
+    printf("task_incdnprio: prioridade dinâmica de %d agora é %d\n", task->id, task->prio_dinam);
+    #endif  //DEBUG
+}
+
+//Retorna um numero positivo se task1 tem mais prioridade que task2,
+//um numero negativo se task2 tem mais prioridade que task1
+//e zero se task1 e task2 são iguais
+int task_compare(task_t *task1, task_t *task2)
+{
+    return task_get_dinamic_prio(task1) - task_get_dinamic_prio(task2);
+}
+
+//Ordenação por counting sort da prioridade dinâmica
+void counting_sort(task_t** task_q, int task_comp(task_t*,task_t*))
+{
+    //Verificação da fila, se a mesma foi iniciada
+    if(!task_q){
+        return;
+    }
+
+    //Verificação da fila, se a mesma não está vazia
+    if(!*task_q){
+        return;
+    }
+
+    //Inicio counting sort (vetor da frequência de prioridade)
+    //Obs.: por poder existir prioridades negativas, os índices devem ser normalizados para PRIO_MAX = 0 (ou prio - PRIO_MAX)
+    int alcance = PRIO_MIN-PRIO_MAX;
+
+    int aux_v[alcance];
+
+    for(int i = 0; i < alcance; i++){
+        aux_v[i] = 0;
+    }
+
+    task_t *first = *task_q;
+
+    aux_v[task_get_dinamic_prio(first)-PRIO_MAX]++;
+
+    for(task_t *it = first->next; it != first; it = it->next){
+        aux_v[task_get_dinamic_prio(it)-PRIO_MAX]++;
+    }
+
+    int sum = 0;
+
+    for(int i = 0; i < alcance; i++){
+        int a_sum = aux_v[i];
+        aux_v[i] = sum;
+        sum += a_sum;
+    }
+
+    int size = queue_size((queue_t*)(*task_q));
+
+    task_t **srt_v = (task_t**)malloc(size*sizeof(task_t*));
+
+    srt_v[aux_v[task_get_dinamic_prio(first)-PRIO_MAX]] = first;
+
+    aux_v[task_get_dinamic_prio(first)-PRIO_MAX]++;
+
+    for(task_t *it = first->next; it != first; it = it->next){
+
+        srt_v[aux_v[task_get_dinamic_prio(it)-PRIO_MAX]] = it;
+
+        aux_v[task_get_dinamic_prio(it)-PRIO_MAX]++;
+    }
+
+    //Fim do counting sort
+    //Refazendo fila, na ordem inversa
+    for(int i = 0; i < size; i++){
+        //Indice da traseira/dianteira de um elemento
+        int traseira = (i-1)%size;
+        int dianteira = (i+1)%size;
+
+        //Garante um indice entre 0 e size
+        while(traseira < 0) traseira += size;
+        while(dianteira < 0) dianteira += size;
+
+        task_t *back = srt_v[traseira];
+        task_t *front = srt_v[dianteira];
+
+        srt_v[i]->prev = back;
+        srt_v[i]->next = front;
+    }
+
+    *task_q = *srt_v;
+
+    free(srt_v);
 }
