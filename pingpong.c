@@ -74,7 +74,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg){
         return -1;
     }
 
-    task->status = NEW;                 //Tarefa criada, mas não inicializada
+    task->status = NOVO;                 //Tarefa criada, mas não inicializada
 
     //A tarefa criada não pertence a nenhuma fila (por enquanto)
     task->next = NULL;
@@ -120,7 +120,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg){
         }
     }
     else{
-        task->status = READY;       //Apenas muda o estado, caso seja tarefa principal ou despachante
+        task->status = PRONTO;       //Apenas muda o estado, caso seja tarefa principal ou despachante
     }
 
 
@@ -148,8 +148,8 @@ void task_exit (int exitCode){
     }
 
     userTasks--;                        //Menos uma tarefa em operação
-    last_task->status = FINISHED;       //Tarefa atual será finalizada
-    tarefa_atual->status = EXECUTING;   //Próxima tarefa entrará em execução
+    last_task->status = FINALIZADO;       //Tarefa atual será finalizada
+    tarefa_atual->status = EXECUTANDO;   //Próxima tarefa entrará em execução
 
     #ifdef DEBUG
     printf("task_exit: tarefa %d sendo encerrado com codigo %d\n", last_task->id, exitCode);
@@ -196,7 +196,7 @@ void task_suspend (task_t *task, task_t **queue){
         working_task = tarefa_atual;    //... caso contrário, utilize a tarefa em execução.
     }
 
-    working_task->status = SUSPENDED;   //Suspende a tarefa em trabalho
+    working_task->status = SUSPENSO;   //Suspende a tarefa em trabalho
 
     if(queue){ //Se for passado uma fila como parâmetro...
     
@@ -251,7 +251,7 @@ void task_yield (){
         }
     }
     else{
-             tarefa_atual->status = READY;   //Caso contrário, apenas muda seu estado para PRONTO
+             tarefa_atual->status = PRONTO;   //Caso contrário, apenas muda seu estado para PRONTO
     }  
 
     //Retorna para o despachante
@@ -269,7 +269,7 @@ void task_yield (){
 //Corpo de função da tarefa despachante
 void dispatcher_body(void *arg){
     
-    dispatcher.status = EXECUTING;  //Despachante em execução
+    dispatcher.status = EXECUTANDO;  //Despachante em execução
     
     while(userTasks > 0) {           //Enquanto houver tarefas de usuários
     
@@ -288,9 +288,9 @@ void dispatcher_body(void *arg){
                 perror(error);
                 exit(-1);
             }
-            dispatcher.status = READY;      //Preparando despachante para troca de tarefa
+            dispatcher.status = PRONTO;      //Preparando despachante para troca de tarefa
             task_switch(next);              //Executa a próxima tarefa
-            dispatcher.status = EXECUTING;  //Ao voltar da última tarefa, despachante entra em execução
+            dispatcher.status = EXECUTANDO;  //Ao voltar da última tarefa, despachante entra em execução
         }
         else if (!fila_tprontas){
             break;
@@ -332,7 +332,7 @@ void init_tarefa_principal(){
 
     tarefa_principal.id = id_count++;     //ID da tarefa principal
     tarefa_principal.parent = NULL;        //A primeira tarefa não possui pai,...
-    tarefa_principal.status = EXECUTING;   //... já está em execução quando foi criada ...
+    tarefa_principal.status = EXECUTANDO;   //... já está em execução quando foi criada ...
 
     task_setprio(&tarefa_principal, STANDARD_PRIO);    //Prioridade default
     task_set_dinamic_prio(&tarefa_principal, task_getprio(&tarefa_principal));
@@ -344,7 +344,7 @@ void init_tarefa_principal(){
 //Retorna 0 caso ocorra tudo certo, -1 caso haja um erro
 int task_set_ready(task_t* task){
 
-        task->status = READY;       //Preparado para execução
+        task->status = PRONTO;       //Preparado para execução
 
         if(task->fila_atual){     //Se estiver inserido em uma fila, ...
             queue_remove(task->fila_atual, (queue_t *) task);   //... remove-lo desta fila e...
@@ -360,7 +360,7 @@ int task_set_ready(task_t* task){
 //Retorna 0 caso ocorra tudo certo, -1 caso haja um erro
 int task_set_executing(task_t* task){
     
-        task->status = EXECUTING; //Em execução
+        task->status = EXECUTANDO; //Em execução
 
         if(task->fila_atual) { //Se estiver inserido em uma fila, ...       
             queue_remove(task->fila_atual, (queue_t *) task);   //... remove-lo desta fila e...
@@ -476,15 +476,15 @@ void task_alpha_dinamic_prio(task_t* task, int alpha)
     if(!task){                   //Para uma tarefa nula, será alterado a tarefa em execução
         task = tarefa_atual;
         	}
-    int new_prio_dinam = task->prio_dinam + alpha;
-    if(new_prio_dinam > PRIO_MIN){               //Prioridade mínima é 20
+    int NOVO_prio_dinam = task->prio_dinam + alpha;
+    if(NOVO_prio_dinam > PRIO_MIN){               //Prioridade mínima é 20
         task->prio_dinam = PRIO_MIN;
     }
-    else if(new_prio_dinam < PRIO_MAX){              //Prioridade máxima é -20
+    else if(NOVO_prio_dinam < PRIO_MAX){              //Prioridade máxima é -20
         task->prio_dinam = PRIO_MAX;
     }
     else{
-        task->prio_dinam = new_prio_dinam;
+        task->prio_dinam = NOVO_prio_dinam;
     }
 
     #ifdef DEBUG

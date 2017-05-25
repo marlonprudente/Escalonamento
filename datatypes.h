@@ -11,7 +11,7 @@
 #include "queue.h"
 
 //Estado de uma tarefa (conforme diagrama de estados): Nova, Pronta, Suspensa e Terminada.
-enum status_t{NEW, READY, EXECUTING, SUSPENDED, FINISHED};
+enum status_t{NOVO, PRONTO, EXECUTANDO, SUSPENSO, FINALIZADO};
 
 // Estrutura que define uma tarefa
 typedef struct task_t
